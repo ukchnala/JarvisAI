@@ -72,16 +72,25 @@ class SettingsManager(context: Context) {
     fun hasGivenFeedback(): Boolean = prefs.getBoolean("feedback_given", false)
     fun markFeedbackGiven() = prefs.edit().putBoolean("feedback_given", true).apply()
 
-    // Background wake-word listening (must stay INSIDE the class)
-    fun getBackgroundListen(): Boolean = prefs.getBoolean("background_listen", false)
-    
-    /** Google STT continuous "hey jarvis" — higher battery; off by default. */
-    fun getSttContinuousWake(): Boolean = prefs.getBoolean("stt_continuous_wake", false)
+    // Background wake-word listening. Older builds wrote "bg_listen" while the
+    // service read "background_listen"; read both keys and keep them in sync.
+    fun getBackgroundListen(): Boolean =
+        prefs.getBoolean("background_listen", prefs.getBoolean("bg_listen", false))
+
+    /** Google SpeechRecognizer fallback is enabled by default only when the user
+     * has explicitly enabled background listening and no Porcupine key is available.
+     * This uses more battery than Porcupine, but prevents the wake setting from
+     * silently doing nothing on builds without PICOVOICE_ACCESS_KEY. */
+    fun getSttContinuousWake(): Boolean =
+        prefs.getBoolean("stt_continuous_wake", getBackgroundListen())
     fun setSttContinuousWake(enabled: Boolean) =
         prefs.edit().putBoolean("stt_continuous_wake", enabled).apply()
 
     fun setBackgroundListen(enabled: Boolean) =
-        prefs.edit().putBoolean("bg_listen", enabled).apply()
+        prefs.edit()
+            .putBoolean("background_listen", enabled)
+            .putBoolean("bg_listen", enabled)
+            .apply()
 
     fun getActiveSuitId(): String = prefs.getString("active_suit_id", "mark_1") ?: "mark_1"
     fun setActiveSuitId(id: String) = prefs.edit().putString("active_suit_id", id).apply()
