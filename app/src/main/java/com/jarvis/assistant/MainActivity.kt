@@ -50,6 +50,8 @@ class MainActivity : AppCompatActivity(),
 
     private val perfHandler = Handler(Looper.getMainLooper())
     private val feedbackHandler = Handler(Looper.getMainLooper())
+    private val responseClearHandler = Handler(Looper.getMainLooper())
+    private var responseClearRunnable: Runnable? = null
     private var feedbackCheckPosted = false
 
     private val activityScope = CoroutineScope(Dispatchers.Main)
@@ -268,7 +270,18 @@ class MainActivity : AppCompatActivity(),
 
     override fun onResponse(text: String, fromCloud: Boolean) {
         val prefix = if (fromCloud) "" else "[OFFLINE] "
-        uiState = uiState.copy(response = prefix + text)
+        val visibleResponse = prefix + text
+        uiState = uiState.copy(response = visibleResponse)
+
+        // Do not leave spoken-response text stuck on screen indefinitely.
+        responseClearRunnable?.let { responseClearHandler.removeCallbacks(it) }
+        val clearThisResponse = Runnable {
+            if (uiState.response == visibleResponse) {
+                uiState = uiState.copy(response = "")
+            }
+        }
+        responseClearRunnable = clearThisResponse
+        responseClearHandler.postDelayed(clearThisResponse, 5_000L)
     }
 
     override fun onHudState(state: HudState) {
@@ -290,6 +303,8 @@ class MainActivity : AppCompatActivity(),
         if (::systemStatus.isInitialized) systemStatus.stop()
         perfHandler.removeCallbacksAndMessages(null)
         feedbackHandler.removeCallbacksAndMessages(null)
+        responseClearHandler.removeCallbacksAndMessages(null)
+        responseClearRunnable = null
         if (bound) {
             service?.listener = null
             unbindService(connection)
