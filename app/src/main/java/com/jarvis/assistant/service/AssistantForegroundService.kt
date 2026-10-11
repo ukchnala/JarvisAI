@@ -180,8 +180,8 @@ class AssistantForegroundService : Service() {
     /** Google SpeechRecognizer continuous keyword match (higher battery, no Picovoice key). */
 
     /**
-     * Continuous Google STT wake is DISABLED — it holds the mic open and drains battery.
-     * Without Porcupine key: rely on clap wake + notification "Listen" + in-app Talk button.
+     * Higher-battery SpeechRecognizer wake fallback. It is used only after the user
+     * explicitly enables background listening and Porcupine is unavailable.
      */
     private fun startSttWakeFallback() {
         val sm = com.jarvis.assistant.util.SettingsManager(this)
