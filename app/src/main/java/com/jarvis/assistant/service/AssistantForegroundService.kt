@@ -61,6 +61,8 @@ class AssistantForegroundService : Service() {
     private var voiceSessionVerified = false
     private val scope = CoroutineScope(Dispatchers.Main)
     private val mainHandler = android.os.Handler(android.os.Looper.getMainLooper())
+    @Volatile private var commandCycleActive = false
+    private var wakeResumeRunnable: Runnable? = null
     private var proactive: com.jarvis.assistant.util.ProactiveAlertManager? = null
     private val proactiveTick = object : Runnable {
         override fun run() {
@@ -148,8 +150,10 @@ class AssistantForegroundService : Service() {
     }
 
     private fun startWakeWordListening() {
-        // Avoid restarting an engine that already owns the microphone.
-        if (porcupine.isRunning() || stt.isListening()) return
+        // Do not let the wake engine compete with one-shot command recognition or TTS.
+        if (commandCycleActive || porcupine.isRunning() || stt.isListening()) return
+        wakeResumeRunnable?.let { mainHandler.removeCallbacks(it) }
+        wakeResumeRunnable = null
         // Prefer Picovoice Porcupine (on-device, low power). Falls back to
         // SpeechRecognizer continuous mode when PICOVOICE_ACCESS_KEY is missing.
         if (porcupine.isAvailable) {
@@ -159,12 +163,7 @@ class AssistantForegroundService : Service() {
                         // Pause wake engine while command STT owns the mic
                         porcupine.stop()
                         startListeningCycle()
-                        // Resume wake listening after a short delay (command cycle ends → IDLE)
-                        mainHandler.postDelayed({
-                            if (com.jarvis.assistant.util.SettingsManager(this).getBackgroundListen()) {
-                                startWakeWordListening()
-                            }
-                        }, 2_500L)
+                        // Wake listening resumes after command processing and speech finish.
                     }
                 },
                 onError = { msg ->
@@ -181,8 +180,8 @@ class AssistantForegroundService : Service() {
     /** Google SpeechRecognizer continuous keyword match (higher battery, no Picovoice key). */
 
     /**
-     * Continuous Google STT wake is DISABLED — it holds the mic open and drains battery.
-     * Without Porcupine key: rely on clap wake + notification "Listen" + in-app Talk button.
+     * Higher-battery SpeechRecognizer wake fallback. It is used only after the user
+     * explicitly enables background listening and Porcupine is unavailable.
      */
     private fun startSttWakeFallback() {
         val sm = com.jarvis.assistant.util.SettingsManager(this)
@@ -199,22 +198,13 @@ class AssistantForegroundService : Service() {
         stt.listenContinuous { trailing ->
             mainHandler.post {
                 try { stt.stopContinuous() } catch (_: Exception) {}
-                startListeningCycle()
-                if (trailing.isNotBlank()) {
-                    // "hey jarvis what time is it" → trailing may already be the command
-                    mainHandler.postDelayed({
-                        if (trailing.length > 2) handleUserSpeech(trailing)
-                    }, 600L)
+                // If the recognizer already captured words after "Jarvis", process those
+                // directly instead of opening a second microphone session at the same time.
+                if (trailing.isNotBlank() && trailing.length > 2) {
+                    handleUserSpeech(trailing)
+                } else {
+                    startListeningCycle()
                 }
-                mainHandler.postDelayed({
-                    if (SettingsManager(this).getBackgroundListen() &&
-                        SettingsManager(this).getSttContinuousWake()
-                    ) {
-                        startSttWakeFallback()
-                    } else if (SettingsManager(this).getBackgroundListen()) {
-                        startWakeWordListening()
-                    }
-                }, 2_500L)
             }
         }
     }
@@ -228,7 +218,9 @@ class AssistantForegroundService : Service() {
     }
 
     fun startListeningCycle() {
-        // One-shot command mic only — never leave continuous STT running.
+        commandCycleActive = true
+        // Stop any wake engine before one-shot command recognition takes ownership of the mic.
+        try { porcupine.stop() } catch (_: Exception) {}
         try { stt.stopContinuous() } catch (_: Exception) {}
         try { com.jarvis.assistant.ui.HudController.listening() } catch (_: Exception) {}
         listener?.onStateChanged(BrainState.LISTENING)
@@ -257,6 +249,7 @@ class AssistantForegroundService : Service() {
                 } else {
                     try { com.jarvis.assistant.ui.HudController.idle() } catch (_: Exception) {}
                     listener?.onStateChanged(BrainState.IDLE)
+                    scheduleBackgroundWakeResume("")
                 }
             },
             onError = {
@@ -264,12 +257,14 @@ class AssistantForegroundService : Service() {
                 try { com.jarvis.assistant.ui.HudController.idle() } catch (_: Exception) {}
                 listener?.onStateChanged(BrainState.ERROR)
                 listener?.onStateChanged(BrainState.IDLE)
+                scheduleBackgroundWakeResume("")
             }
         )
         }, 900L)
     }
 
     private fun handleUserSpeech(speech: String) {
+        commandCycleActive = true
         listener?.onTranscript(speech)
         listener?.onStateChanged(BrainState.THINKING)
 
@@ -289,7 +284,28 @@ class AssistantForegroundService : Service() {
             }
             tts.speak(speechText)
             listener?.onStateChanged(BrainState.IDLE)
+            scheduleBackgroundWakeResume(speechText)
         }
+    }
+
+
+    /**
+     * Release the command microphone before restarting the always-on wake listener.
+     * The delay gives the current spoken reply time to finish and prevents two audio
+     * recognizers from competing for the microphone.
+     */
+    private fun scheduleBackgroundWakeResume(spokenReply: String) {
+        wakeResumeRunnable?.let { mainHandler.removeCallbacks(it) }
+        val delayMs = if (spokenReply.isBlank()) 1_200L
+            else (spokenReply.length * 75L).coerceIn(2_500L, 15_000L) + 800L
+        val resume = Runnable {
+            commandCycleActive = false
+            if (SettingsManager(this).getBackgroundListen()) {
+                startWakeWordListening()
+            }
+        }
+        wakeResumeRunnable = resume
+        mainHandler.postDelayed(resume, delayMs)
     }
 
     /**
