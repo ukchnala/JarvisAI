@@ -18,6 +18,7 @@ import android.widget.FrameLayout
 import android.widget.LinearLayout
 import android.widget.ScrollView
 import android.widget.SeekBar
+import android.widget.Switch
 import android.widget.TextView
 import android.widget.Toast
 import androidx.activity.result.contract.ActivityResultContracts
@@ -279,6 +280,39 @@ class SettingsActivity : AppCompatActivity() {
                     override fun onStopTrackingTouch(sb: SeekBar?) { tts.speak("Voice speed test.") }
                 })
             })
+        })
+
+        root.addView(sectionCard {
+            addView(sectionTitle("Background Wake Word", R.drawable.ic_mic))
+            addView(bodyText(
+                "Keep Jarvis listening while you use other apps. Say \"Jarvis\" to wake it. " +
+                "Android will keep a foreground microphone notification while listening. " +
+                "If no Picovoice key is configured, speech-recognition fallback is used and may use more battery."
+            ))
+            val backgroundWakeSwitch = Switch(this@SettingsActivity).apply {
+                text = "Listen for Jarvis in background"
+                setTextColor(Color.WHITE)
+                textSize = 15f
+                isChecked = settings.getBackgroundListen()
+            }
+            addView(backgroundWakeSwitch)
+            backgroundWakeSwitch.setOnCheckedChangeListener { _, enabled ->
+                settings.setBackgroundListen(enabled)
+                settings.setSttContinuousWake(enabled)
+                try {
+                    val serviceIntent = Intent(
+                        this@SettingsActivity,
+                        com.jarvis.assistant.service.AssistantForegroundService::class.java
+                    )
+                    ContextCompat.startForegroundService(this@SettingsActivity, serviceIntent)
+                    toast(if (enabled) "Background wake enabled." else "Background wake disabled.")
+                } catch (e: Exception) {
+                    backgroundWakeSwitch.isChecked = !enabled
+                    settings.setBackgroundListen(!enabled)
+                    settings.setSttContinuousWake(!enabled)
+                    toast("Could not update background listening: ${e.message?.take(60)}")
+                }
+            }
         })
 
         root.addView(sectionCard {

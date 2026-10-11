@@ -136,6 +136,8 @@ class AssistantForegroundService : Service() {
         if (sm.getBackgroundListen()) {
             startWakeWordListening()
         } else {
+            // Stop both wake engines when the user disables background listening.
+            try { porcupine.stop() } catch (_: Exception) {}
             try { stt.stopContinuous() } catch (_: Exception) {}
         }
         val action = intent?.action
@@ -146,6 +148,8 @@ class AssistantForegroundService : Service() {
     }
 
     private fun startWakeWordListening() {
+        // Avoid restarting an engine that already owns the microphone.
+        if (porcupine.isRunning() || stt.isListening()) return
         // Prefer Picovoice Porcupine (on-device, low power). Falls back to
         // SpeechRecognizer continuous mode when PICOVOICE_ACCESS_KEY is missing.
         if (porcupine.isAvailable) {
