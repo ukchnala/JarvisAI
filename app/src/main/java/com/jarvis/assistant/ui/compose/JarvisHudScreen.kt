@@ -223,7 +223,16 @@ fun JarvisHudScreen(
                 online = true
             )
 
-            Spacer(Modifier.height(10.dp))
+            Spacer(Modifier.height(8.dp))
+
+            ModuleTile(
+                if (ui.backgroundListening) "BACKGROUND LISTEN: ON" else "BACKGROUND LISTEN: OFF",
+                if (ui.backgroundListening) "Wake word active · say Jarvis" else "Tap to enable wake word in background",
+                onClick = actions.onBackgroundToggle,
+                modifier = Modifier.fillMaxWidth()
+            )
+
+            Spacer(Modifier.height(6.dp))
 
             // Reactor hero with side telemetry panels
             Row(
@@ -255,13 +264,6 @@ fun JarvisHudScreen(
                 ModuleTile("CHAT", "Speak or type.", onClick = actions.onChat, modifier = Modifier.weight(1f))
                 ModuleTile("VISION", "Camera intelligence.", onClick = actions.onVision, modifier = Modifier.weight(1f))
             }
-            Spacer(Modifier.height(8.dp))
-            ModuleTile(
-                if (ui.backgroundListening) "BACKGROUND LISTEN: ON" else "BACKGROUND LISTEN: OFF",
-                if (ui.backgroundListening) "Wake word active · say Jarvis" else "Tap to enable wake word in background",
-                onClick = actions.onBackgroundToggle,
-                modifier = Modifier.fillMaxWidth()
-            )
             Spacer(Modifier.height(8.dp))
             Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 ModuleTile("SECURITY", "Device posture report.", onClick = actions.onSecurity, modifier = Modifier.weight(1f))
