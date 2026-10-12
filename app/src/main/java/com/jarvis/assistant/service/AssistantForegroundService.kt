@@ -131,8 +131,13 @@ class AssistantForegroundService : Service() {
     }
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
-        startForeground(NOTIF_ID, buildNotification("J.A.R.V.I.S. online — clap or say Jarvis to activate"))
-        val sm = com.jarvis.assistant.util.SettingsManager(this)
+        val sm = SettingsManager(this)
+        val notificationText = if (sm.getBackgroundListen()) {
+            "Background wake enabled — say Jarvis to activate"
+        } else {
+            "Online — tap Listen to activate"
+        }
+        startForeground(NOTIF_ID, buildNotification(notificationText))
         // NEVER open Google STT here. Only low-power Porcupine (if key) or clap.
         // background_listen only starts Porcupine; STT continuous path is a no-op.
         if (sm.getBackgroundListen()) {
@@ -157,6 +162,11 @@ class AssistantForegroundService : Service() {
         wakeResumeRunnable = null
         try { porcupine.stop() } catch (_: Exception) {}
         try { stt.stopContinuous() } catch (_: Exception) {}
+        try {
+            getSystemService(NotificationManager::class.java).notify(
+                NOTIF_ID, buildNotification("Background wake disabled — tap Listen to activate")
+            )
+        } catch (_: Exception) {}
         android.util.Log.i("JarvisService", "Background wake listening disabled by user")
     }
 
