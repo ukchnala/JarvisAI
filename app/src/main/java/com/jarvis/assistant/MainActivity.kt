@@ -83,12 +83,14 @@ class MainActivity : AppCompatActivity(),
 
         settings = com.jarvis.assistant.util.SettingsManager(this)
         settings.getFirstLaunchTime()
+        uiState = uiState.copy(backgroundListening = settings.getBackgroundListen())
 
         setContent {
             JarvisHudScreen(
                 ui = uiState,
                 actions = JarvisHudActions(
                     onTalk = { service?.startListeningCycle() },
+                    onBackgroundToggle = { toggleBackgroundListening() },
                     onReactorTap = {
                         if (bound) service?.startListeningCycle()
                         else permissionLauncher.launch(arrayOf(
@@ -233,6 +235,35 @@ class MainActivity : AppCompatActivity(),
             } else {
                 uiState = uiState.copy(location = "—")
             }
+        }
+    }
+
+    private fun toggleBackgroundListening() {
+        val enable = !settings.getBackgroundListen()
+        if (enable && checkSelfPermission(Manifest.permission.RECORD_AUDIO) != android.content.pm.PackageManager.PERMISSION_GRANTED) {
+            Toast.makeText(this, "Microphone permission chahiye. Allow karo, phir button dobara dabao.", Toast.LENGTH_LONG).show()
+            permissionLauncher.launch(arrayOf(Manifest.permission.RECORD_AUDIO))
+            return
+        }
+
+        try {
+            settings.setBackgroundListen(enable)
+            settings.setSttContinuousWake(enable)
+            uiState = uiState.copy(backgroundListening = enable)
+            if (enable) {
+                // Start while this Activity is visible: Android 14+ restricts starting
+                // microphone foreground services from the background.
+                startAssistantService()
+                Toast.makeText(this, "Background listening ON. Notification mein Jarvis active dikhega.", Toast.LENGTH_LONG).show()
+            } else {
+                service?.stopBackgroundWakeListening()
+                Toast.makeText(this, "Background listening OFF.", Toast.LENGTH_SHORT).show()
+            }
+        } catch (e: Exception) {
+            settings.setBackgroundListen(!enable)
+            settings.setSttContinuousWake(!enable)
+            uiState = uiState.copy(backgroundListening = !enable)
+            Toast.makeText(this, "Background listening change nahi hua: ${e.message?.take(70)}", Toast.LENGTH_LONG).show()
         }
     }
 
