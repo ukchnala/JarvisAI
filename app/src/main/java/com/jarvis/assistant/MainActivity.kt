@@ -327,7 +327,10 @@ class MainActivity : AppCompatActivity(),
     override fun onResume() {
         com.jarvis.assistant.ui.HudController.addListener(this)
         super.onResume()
-        if (::settings.isInitialized) scheduleFeedbackPromptCheck()
+        if (::settings.isInitialized) {
+            uiState = uiState.copy(backgroundListening = settings.getBackgroundListen())
+            scheduleFeedbackPromptCheck()
+        }
     }
 
     override fun onDestroy() {
