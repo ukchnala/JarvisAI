@@ -23,8 +23,8 @@ android {
         applicationId = "com.aira.jarvis"
         minSdk = 26
         targetSdk = 34
-        versionCode = 1
-        versionName = "1.0-test"
+        versionCode = 2
+        versionName = "1.0-test-2"
 
         buildConfigField("String", "GEMINI_API_KEY", "\"${apiKey("GEMINI_API_KEY")}\"")
         buildConfigField("String", "OPENWEATHER_API_KEY", "\"${apiKey("OPENWEATHER_API_KEY")}\"")
