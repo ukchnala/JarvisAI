@@ -270,7 +270,7 @@ class MainActivity : AppCompatActivity(),
     private fun startAssistantService() {
         val intent = Intent(this, AssistantForegroundService::class.java)
         startForegroundService(intent)
-        bindService(intent, connection, Context.BIND_AUTO_CREATE)
+        if (!bound) bindService(intent, connection, Context.BIND_AUTO_CREATE)
     }
 
     override fun onStateChanged(state: BrainState) {
