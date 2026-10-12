@@ -259,7 +259,15 @@ class MainActivity : AppCompatActivity(),
                 startAssistantService()
                 Toast.makeText(this, "Background listening ON. Notification mein Jarvis active dikhega.", Toast.LENGTH_LONG).show()
             } else {
-                service?.stopBackgroundWakeListening()
+                // The Activity may be unbound while the foreground service is still alive.
+                // If service is null, re-deliver the OFF state through onStartCommand so
+                // the running service stops both wake engines instead of leaving a stale mic session.
+                val runningService = service
+                if (runningService != null) {
+                    runningService.stopBackgroundWakeListening()
+                } else {
+                    startAssistantService()
+                }
                 Toast.makeText(this, "Background listening OFF.", Toast.LENGTH_SHORT).show()
             }
         } catch (e: Exception) {
