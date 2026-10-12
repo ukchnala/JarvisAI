@@ -149,6 +149,17 @@ class AssistantForegroundService : Service() {
         return START_STICKY
     }
 
+    /** Stop always-on wake detection immediately when the user switches it off. */
+    fun stopBackgroundWakeListening() {
+        SettingsManager(this).setBackgroundListen(false)
+        SettingsManager(this).setSttContinuousWake(false)
+        wakeResumeRunnable?.let { mainHandler.removeCallbacks(it) }
+        wakeResumeRunnable = null
+        try { porcupine.stop() } catch (_: Exception) {}
+        try { stt.stopContinuous() } catch (_: Exception) {}
+        android.util.Log.i("JarvisService", "Background wake listening disabled by user")
+    }
+
     private fun startWakeWordListening() {
         // Do not let the wake engine compete with one-shot command recognition or TTS.
         if (commandCycleActive || porcupine.isRunning() || stt.isListening()) return
