@@ -61,7 +61,10 @@ class MainActivity : AppCompatActivity(),
     private val permissionLauncher = registerForActivityResult(
         ActivityResultContracts.RequestMultiplePermissions()
     ) { _ ->
-        startAssistantService()
+        // A microphone foreground service must not start if RECORD_AUDIO was denied.
+        if (checkSelfPermission(Manifest.permission.RECORD_AUDIO) == android.content.pm.PackageManager.PERMISSION_GRANTED) {
+            startAssistantService()
+        }
         fetchLocationAndWeather()
     }
 
@@ -268,6 +271,10 @@ class MainActivity : AppCompatActivity(),
     }
 
     private fun startAssistantService() {
+        if (checkSelfPermission(Manifest.permission.RECORD_AUDIO) != android.content.pm.PackageManager.PERMISSION_GRANTED) {
+            Toast.makeText(this, "Microphone permission required for voice/background listening.", Toast.LENGTH_LONG).show()
+            return
+        }
         val intent = Intent(this, AssistantForegroundService::class.java)
         startForegroundService(intent)
         if (!bound) bindService(intent, connection, Context.BIND_AUTO_CREATE)
