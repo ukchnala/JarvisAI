@@ -105,11 +105,13 @@ data class JarvisHudUiState(
     val location: String = "—",
     val weather: String = "—",
     val response: String = "Online.",
-    val waveformActive: Boolean = false
+    val waveformActive: Boolean = false,
+    val backgroundListening: Boolean = false
 )
 
 data class JarvisHudActions(
     val onTalk: () -> Unit = {},
+    val onBackgroundToggle: () -> Unit = {},
     val onReactorTap: () -> Unit = {},
     val onChat: () -> Unit = {},
     val onSettings: () -> Unit = {},
@@ -253,6 +255,13 @@ fun JarvisHudScreen(
                 ModuleTile("CHAT", "Speak or type.", onClick = actions.onChat, modifier = Modifier.weight(1f))
                 ModuleTile("VISION", "Camera intelligence.", onClick = actions.onVision, modifier = Modifier.weight(1f))
             }
+            Spacer(Modifier.height(8.dp))
+            ModuleTile(
+                if (ui.backgroundListening) "BACKGROUND LISTEN: ON" else "BACKGROUND LISTEN: OFF",
+                if (ui.backgroundListening) "Wake word active · say Jarvis" else "Tap to enable wake word in background",
+                onClick = actions.onBackgroundToggle,
+                modifier = Modifier.fillMaxWidth()
+            )
             Spacer(Modifier.height(8.dp))
             Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 ModuleTile("SECURITY", "Device posture report.", onClick = actions.onSecurity, modifier = Modifier.weight(1f))
