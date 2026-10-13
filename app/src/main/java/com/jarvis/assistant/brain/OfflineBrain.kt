@@ -200,7 +200,7 @@ class OfflineBrain(
         // do not depend on cloud classification.
         if (containsAny(cmd, "scroll down", "scroll up", "scroll forward", "scroll backward",
                 "neeche scroll", "upar scroll", "aage scroll", "peeche scroll") ||
-            Regex("""^(tap|click|press|select|chuno|dabao)\\s+.+$""").containsMatchIn(cmd)) {
+            Regex("""^(tap|click|press|select|chuno|dabao)\s+.+$""").containsMatchIn(cmd)) {
             return executor.execute(AssistantCommand("screen_act", message = text))
         }
 
