@@ -17,7 +17,7 @@ class PersistentMemory(context: Context) {
 
     private val prefs = context.getSharedPreferences("jarvis_memory", Context.MODE_PRIVATE)
     private val factsKey = "__facts_list__"
-    private val maxFacts = 80
+    private val maxFacts = 300
 
     fun remember(key: String, value: String) {
         prefs.edit().putString(key.lowercase().trim(), value.trim()).apply()
@@ -50,8 +50,28 @@ class PersistentMemory(context: Context) {
         val clean = fact.trim()
         if (clean.isBlank()) return
         appendFact(clean)
-        // Index under a stable key for quick recall of "last fact"
-        remember("last_fact", clean)
+        // Store the shortcut without adding a duplicate timeline entry.
+        prefs.edit().putString("last_fact", clean).apply()
+    }
+
+    /** Search recent facts by meaningful words, preferring entries matching more terms. */
+    fun searchFacts(query: String, limit: Int = 8): List<String> {
+        val terms = query.lowercase()
+            .split(Regex("[^\\p{L}\\p{N}]+"))
+            .filter { it.length >= 2 }
+            .distinct()
+        if (terms.isEmpty()) return emptyList()
+        return getFacts(maxFacts)
+            .mapIndexed { index, fact ->
+                val normalized = fact.lowercase()
+                val score = terms.count { normalized.contains(it) }
+                Triple(fact, score, index)
+            }
+            .filter { it.second > 0 }
+            .sortedWith(compareByDescending<Triple<String, Int, Int>> { it.second }
+                .thenByDescending { it.third })
+            .take(limit)
+            .map { it.first }
     }
 
     fun getFacts(limit: Int = 30): List<String> {
