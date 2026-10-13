@@ -827,7 +827,7 @@ private fun setAlarm(target: String?): String {
             ?: return "Accessibility is off, sir. Enable Jarvis under Settings → Accessibility."
         val text = svc.getScreenText()
         if (text.isBlank() || text.startsWith("No screen") || text.startsWith("Screen appears")) return text
-        return if (text.length > 900) text.take(900) + "… (truncated)" else text
+        return if (text.length > 6000) text.take(6000) + "… (screen text limit reached)" else text
     }
 
 

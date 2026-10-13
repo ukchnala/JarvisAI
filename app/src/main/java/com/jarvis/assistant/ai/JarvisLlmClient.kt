@@ -42,7 +42,7 @@ WHO YOU ARE:
 - You are precise with facts. You never bluff. If you lack data, you say so cleanly and offer the next best step.
 
 HOW YOU SPEAK:
-- Formal British English when the user writes in English. Polite register in other languages; match the user's language.
+- Match the user's language every time. If the user speaks Hindi or Hinglish, answer naturally in Hindi/Hinglish (Devanagari or Roman script matching the user), not English unless asked. Use formal British English only when the user writes in English.
 - Address the user as "sir" in English (unless they ask otherwise).
 - Concise for speech: usually 1–3 sentences. Expand only when asked for detail, analysis, or plans.
 - No emojis. No slang. No corporate filler ("Happy to help!", "Absolutely!").
@@ -78,7 +78,7 @@ EXAMPLES OF TONE:
                 return@withContext Result(false, "", "Empty message")
             }
             val messages = JSONArray()
-            messages.put(JSONObject().put("role", "system").put("content", SYSTEM_PROMPT))
+            messages.put(JSONObject().put("role", "system").put("content", if (memoryContext.isBlank()) SYSTEM_PROMPT else SYSTEM_PROMPT + "\n\nMEMORY CONTEXT (trusted user facts; use when relevant, never invent beyond it):\n" + memoryContext))
             history.takeLast(8).forEach { (role, content) ->
                 val r = if (role == "assistant") "assistant" else "user"
                 messages.put(JSONObject().put("role", r).put("content", content))
