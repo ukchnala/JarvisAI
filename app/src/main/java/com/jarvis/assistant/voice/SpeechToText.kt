@@ -17,6 +17,15 @@ class SpeechToText(private val context: Context) {
     private var isListeningContinuously = false
     private var lastWakeMs = 0L
     private val mainHandler = Handler(Looper.getMainLooper())
+    private var longSessionActive = false
+    private val longTranscript = StringBuilder()
+    private var longSessionStartedAt = 0L
+    private var longQuietRunnable: Runnable? = null
+    private var longLimitRunnable: Runnable? = null
+    private var longResultCallback: ((String) -> Unit)? = null
+    private var longErrorCallback: (() -> Unit)? = null
+    private val longSessionLimitMs = 5 * 60_000L
+    private val longQuietMs = 7_000L
 
     private val wakeWords = listOf(
         "hey jarvis", "ok jarvis", "okay jarvis", "hi jarvis",
@@ -25,6 +34,98 @@ class SpeechToText(private val context: Context) {
         "jervis", "jarvish",
         "जार्विस", "जारविस", "जर्विस", "हे जार्विस"
     )
+
+    /**
+     * Long dictation mode: accumulates final recognition chunks for up to five minutes.
+     * Android SpeechRecognizer often ends a single segment after a short pause, so each
+     * final segment is appended and recognition restarts. A seven-second quiet period
+     * finishes the complete utterance. The five-minute limit is a hard safety bound.
+     */
+    fun listenLong(onResult: (String) -> Unit, onError: () -> Unit) {
+        stopInternal()
+        longSessionActive = true
+        longTranscript.setLength(0)
+        longSessionStartedAt = System.currentTimeMillis()
+        longResultCallback = onResult
+        longErrorCallback = onError
+        longQuietRunnable?.let { mainHandler.removeCallbacks(it) }
+        longLimitRunnable?.let { mainHandler.removeCallbacks(it) }
+        longLimitRunnable = Runnable { finishLongSession() }
+        mainHandler.postDelayed(longLimitRunnable!!, longSessionLimitMs)
+        startLongSession()
+    }
+
+    private fun startLongSession() {
+        if (!longSessionActive) return
+        try {
+            recognizer?.destroy()
+        } catch (_: Exception) {}
+        recognizer = SpeechRecognizer.createSpeechRecognizer(context)
+        recognizer?.setRecognitionListener(object : RecognitionListener {
+            override fun onResults(results: Bundle?) {
+                if (!longSessionActive) return
+                val segment = bestTranscript(results).trim()
+                if (segment.isNotBlank()) {
+                    if (longTranscript.isNotEmpty()) longTranscript.append(' ')
+                    longTranscript.append(segment)
+                    longQuietRunnable?.let { mainHandler.removeCallbacks(it) }
+                    longQuietRunnable = Runnable { finishLongSession() }
+                    mainHandler.postDelayed(longQuietRunnable!!, longQuietMs)
+                }
+                if (System.currentTimeMillis() - longSessionStartedAt >= longSessionLimitMs) {
+                    finishLongSession()
+                } else {
+                    try { recognizer?.destroy() } catch (_: Exception) {}
+                    recognizer = null
+                    mainHandler.postDelayed({ startLongSession() }, 250L)
+                }
+            }
+
+            override fun onError(error: Int) {
+                if (!longSessionActive) return
+                Log.d("SpeechToText", "Long dictation segment error: $error")
+                if (longTranscript.isNotEmpty()) {
+                    longQuietRunnable?.let { mainHandler.removeCallbacks(it) }
+                    longQuietRunnable = Runnable { finishLongSession() }
+                    mainHandler.postDelayed(longQuietRunnable!!, longQuietMs)
+                }
+                if (error == SpeechRecognizer.ERROR_RECOGNIZER_BUSY) {
+                    mainHandler.postDelayed({ startLongSession() }, 500L)
+                } else if (error == SpeechRecognizer.ERROR_NO_MATCH ||
+                    error == SpeechRecognizer.ERROR_SPEECH_TIMEOUT) {
+                    mainHandler.postDelayed({ startLongSession() }, 300L)
+                } else {
+                    if (longTranscript.isEmpty()) finishLongSession()
+                    else mainHandler.postDelayed({ startLongSession() }, 400L)
+                }
+            }
+
+            override fun onReadyForSpeech(params: Bundle?) {}
+            override fun onBeginningOfSpeech() {}
+            override fun onRmsChanged(rmsdB: Float) {}
+            override fun onBufferReceived(buffer: ByteArray?) {}
+            override fun onEndOfSpeech() {}
+            override fun onPartialResults(partialResults: Bundle?) {}
+            override fun onEvent(eventType: Int, params: Bundle?) {}
+        })
+        recognizer?.startListening(buildIntent(forWakeWord = false))
+    }
+
+    private fun finishLongSession() {
+        if (!longSessionActive) return
+        longSessionActive = false
+        longQuietRunnable?.let { mainHandler.removeCallbacks(it) }
+        longLimitRunnable?.let { mainHandler.removeCallbacks(it) }
+        longQuietRunnable = null
+        longLimitRunnable = null
+        try { recognizer?.cancel(); recognizer?.destroy() } catch (_: Exception) {}
+        recognizer = null
+        val complete = longTranscript.toString().trim()
+        if (complete.isNotBlank()) longResultCallback?.invoke(complete)
+        else longErrorCallback?.invoke()
+        longResultCallback = null
+        longErrorCallback = null
+    }
 
     fun listenOnce(onResult: (String) -> Unit, onError: () -> Unit) {
         stopInternal()
@@ -124,6 +225,11 @@ class SpeechToText(private val context: Context) {
         }, 280)
     }
 
+    fun stopLongListening() {
+        if (!longSessionActive) return
+        finishLongSession()
+    }
+
     fun stopContinuous() {
         isListeningContinuously = false
         mainHandler.removeCallbacksAndMessages(null)
@@ -175,8 +281,9 @@ class SpeechToText(private val context: Context) {
         putExtra(RecognizerIntent.EXTRA_PARTIAL_RESULTS, true)
         putExtra(RecognizerIntent.EXTRA_MAX_RESULTS, 5)
         putExtra(RecognizerIntent.EXTRA_CALLING_PACKAGE, context.packageName)
-        putExtra(RecognizerIntent.EXTRA_LANGUAGE, "en-IN")
-        putExtra(RecognizerIntent.EXTRA_LANGUAGE_PREFERENCE, "en-IN")
+        // Hindi recognizer handles Hindi speech; English app names remain in the transcript where supported.
+        putExtra(RecognizerIntent.EXTRA_LANGUAGE, "hi-IN")
+        putExtra(RecognizerIntent.EXTRA_LANGUAGE_PREFERENCE, "hi-IN")
         if (forWakeWord) {
             putExtra(RecognizerIntent.EXTRA_SPEECH_INPUT_COMPLETE_SILENCE_LENGTH_MILLIS, 1200L)
             putExtra(RecognizerIntent.EXTRA_SPEECH_INPUT_POSSIBLY_COMPLETE_SILENCE_LENGTH_MILLIS, 800L)
@@ -190,6 +297,9 @@ class SpeechToText(private val context: Context) {
 
     fun destroy() {
         isListeningContinuously = false
+        longSessionActive = false
+        longQuietRunnable?.let { mainHandler.removeCallbacks(it) }
+        longLimitRunnable?.let { mainHandler.removeCallbacks(it) }
         mainHandler.removeCallbacksAndMessages(null)
         stopInternal()
     }
