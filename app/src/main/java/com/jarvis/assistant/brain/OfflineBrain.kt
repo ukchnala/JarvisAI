@@ -199,8 +199,8 @@ class OfflineBrain(
         // Explicit screen navigation/action commands are handled locally so they
         // do not depend on cloud classification.
         if (containsAny(cmd, "scroll down", "scroll up", "scroll forward", "scroll backward",
-                "neeche scroll", "upar scroll", "aage scroll", "peeche scroll") ||
-            Regex("""^(tap|click|press|select|chuno|dabao)\s+.+$""").containsMatchIn(cmd)) {
+                "neeche scroll", "upar scroll", "aage scroll", "peeche scroll", "नीचे स्क्रॉल", "ऊपर स्क्रॉल") ||
+            Regex("""^(?:tap|click|press|select|chuno|dabao|टैप करो|क्लिक करो|दबाओ|चुनो)\s+.+$""").containsMatchIn(cmd)) {
             return executor.execute(AssistantCommand("screen_act", message = text))
         }
 
