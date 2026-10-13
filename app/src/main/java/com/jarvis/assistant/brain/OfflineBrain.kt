@@ -346,6 +346,33 @@ class OfflineBrain(
             conversationContext.addMessage("Noted, sir.", isUserInput = false)
             return "Noted, sir. I've stored that in long-term memory."
         }
+        // Search the long-term fact timeline instead of returning only the latest memories.
+        if (containsAny(cmd, "search memory", "find in memory", "search my memory", "find memory", "look up memory",
+                "yaad mein dhundo", "yaad mein khojo", "memory mein dhundo", "memory search",
+                "what did i say about", "what do you know about my")) {
+            val query = when {
+                "search memory" in cmd -> text.substringAfter("search memory", "").trim()
+                "search my memory" in cmd -> text.substringAfter("search my memory", "").trim()
+                "find in memory" in cmd -> text.substringAfter("find in memory", "").trim()
+                "find memory" in cmd -> text.substringAfter("find memory", "").trim()
+                "look up memory" in cmd -> text.substringAfter("look up memory", "").trim()
+                "yaad mein dhundo" in cmd -> text.substringAfter("yaad mein dhundo", "").trim()
+                "yaad mein khojo" in cmd -> text.substringAfter("yaad mein khojo", "").trim()
+                "memory mein dhundo" in cmd -> text.substringAfter("memory mein dhundo", "").trim()
+                "what did i say about" in cmd -> text.substringAfter("about", "").trim()
+                "what do you know about my" in cmd -> text.substringAfter("about my", "").trim()
+                else -> text.substringAfter("memory search", "").trim()
+            }.trimEnd('?', '.', ' ')
+            if (query.isBlank()) return "Tell me a word or topic to search for in memory, sir."
+            val matches = memory.searchFacts(query, 8)
+            val reply = if (matches.isEmpty()) {
+                "I couldn't find a saved memory matching " + query + ", sir."
+            } else {
+                "I found " + matches.size + " relevant memory entries: " + matches.joinToString("; ")
+            }
+            conversationContext.addMessage(reply, isUserInput = false)
+            return reply
+        }
         if (containsAny(cmd, "what did i tell you", "what did you remember", "recall that", "recall my note", "what do you remember", "my memories", "yaad hai")) {
             val facts = memory.getFacts(8)
             val last = memory.recall("last_note")
