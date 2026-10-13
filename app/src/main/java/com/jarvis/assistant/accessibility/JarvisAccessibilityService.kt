@@ -78,6 +78,58 @@ class JarvisAccessibilityService : AccessibilityService() {
         }
     }
 
+    /** Scroll the active app's accessibility tree. Returns false when the screen cannot scroll. */
+    fun scrollScreen(forward: Boolean = true): Boolean {
+        val root = rootInActiveWindow ?: return false
+        val action = if (forward) AccessibilityNodeInfo.ACTION_SCROLL_FORWARD
+                     else AccessibilityNodeInfo.ACTION_SCROLL_BACKWARD
+        return try {
+            if (root.performAction(action)) return true
+            findScrollable(root)?.performAction(action) == true
+        } catch (_: Exception) {
+            false
+        }
+    }
+
+    private fun findScrollable(node: AccessibilityNodeInfo): AccessibilityNodeInfo? {
+        if (node.isScrollable) return node
+        for (i in 0 until node.childCount) {
+            val child = try { node.getChild(i) } catch (_: Exception) { null } ?: continue
+            findScrollable(child)?.let { return it }
+        }
+        return null
+    }
+
+    /** Click a visible, non-sensitive label only when the user explicitly names it. */
+    fun clickVisibleText(query: String): Boolean {
+        val q = query.trim().lowercase()
+        if (q.length < 2) return false
+        val root = rootInActiveWindow ?: return false
+        val node = findTextNode(root, q, 0) ?: return false
+        var candidate: AccessibilityNodeInfo? = node
+        var depth = 0
+        while (candidate != null && depth < 8) {
+            if (candidate.isClickable) {
+                return try { candidate.performAction(AccessibilityNodeInfo.ACTION_CLICK) } catch (_: Exception) { false }
+            }
+            candidate = try { candidate.parent } catch (_: Exception) { null }
+            depth++
+        }
+        return false
+    }
+
+    private fun findTextNode(node: AccessibilityNodeInfo, query: String, depth: Int): AccessibilityNodeInfo? {
+        if (depth > 28 || node.isPassword) return null
+        val label = listOfNotNull(node.text?.toString(), node.contentDescription?.toString())
+            .joinToString(" ").lowercase().trim()
+        if (label.isNotBlank() && (label == query || label.contains(query))) return node
+        for (i in 0 until node.childCount) {
+            val child = try { node.getChild(i) } catch (_: Exception) { null } ?: continue
+            findTextNode(child, query, depth + 1)?.let { return it }
+        }
+        return null
+    }
+
     fun autoTapSend(attemptsLeft: Int = 6) {
         if (attemptsLeft <= 0) {
             Log.w("JarvisAccessibility", "autoTapSend: gave up, no Send button found")
