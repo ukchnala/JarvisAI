@@ -196,6 +196,14 @@ class OfflineBrain(
 
 
 
+        // Explicit screen navigation/action commands are handled locally so they
+        // do not depend on cloud classification.
+        if (containsAny(cmd, "scroll down", "scroll up", "scroll forward", "scroll backward",
+                "neeche scroll", "upar scroll", "aage scroll", "peeche scroll") ||
+            Regex("""^(tap|click|press|select|chuno|dabao)\\s+.+$""").containsMatchIn(cmd)) {
+            return executor.execute(AssistantCommand("screen_act", message = text))
+        }
+
         // HIGH PRIORITY: screen analyze (STT often mangles "analyze")
         run {
             val screenIntent = containsAny(cmd,
