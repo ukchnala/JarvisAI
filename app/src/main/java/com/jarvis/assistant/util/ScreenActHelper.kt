@@ -54,9 +54,11 @@ object ScreenActHelper {
         val accessibility = JarvisAccessibilityService.instance
         if (accessibility != null) {
             val scrollForward = intent.contains("scroll down") || intent.contains("scroll forward") ||
-                intent.contains("neeche scroll") || intent.contains("aage scroll")
+                intent.contains("neeche scroll") || intent.contains("aage scroll") ||
+                intent.contains("नीचे स्क्रॉल")
             val scrollBackward = intent.contains("scroll up") || intent.contains("scroll backward") ||
-                intent.contains("upar scroll") || intent.contains("peeche scroll")
+                intent.contains("upar scroll") || intent.contains("peeche scroll") ||
+                intent.contains("ऊपर स्क्रॉल")
             if (scrollForward || scrollBackward) {
                 val moved = accessibility.scrollScreen(forward = scrollForward)
                 return Plan(clipped, null, if (moved) {
@@ -64,7 +66,7 @@ object ScreenActHelper {
                 } else "Is screen par scroll karna possible nahi hua.")
             }
 
-            val clickMatch = Regex("""(?:tap|click|press|select|chuno|dabao)\s+(.+)$""")
+            val clickMatch = Regex("""(?:tap|click|press|select|chuno|dabao|टैप करो|क्लिक करो|दबाओ|चुनो)\s+(.+)$""")
                 .find(intent)
             if (clickMatch != null) {
                 val label = clickMatch.groupValues[1].trim().trimEnd('.', '?', '!')
