@@ -262,9 +262,8 @@ class AssistantForegroundService : Service() {
 
         // Let "Yes sir/ma'am" finish before opening the mic (reduces cutting off the command)
         mainHandler.postDelayed({
-        stt.listenOnce(
+        stt.listenLong(
             onResult = { speech ->
-                try { stt.stopContinuous() } catch (_: Exception) {}
                 if (speech.isNotBlank()) {
                     handleUserSpeech(speech)
                 } else {
@@ -274,7 +273,6 @@ class AssistantForegroundService : Service() {
                 }
             },
             onError = {
-                try { stt.stopContinuous() } catch (_: Exception) {}
                 try { com.jarvis.assistant.ui.HudController.idle() } catch (_: Exception) {}
                 listener?.onStateChanged(BrainState.ERROR)
                 listener?.onStateChanged(BrainState.IDLE)
