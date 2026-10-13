@@ -64,7 +64,7 @@ object ScreenActHelper {
                 } else "Is screen par scroll karna possible nahi hua.")
             }
 
-            val clickMatch = Regex("""(?:tap|click|press|select|chuno|dabao)\\s+(.+)$""")
+            val clickMatch = Regex("""(?:tap|click|press|select|chuno|dabao)\s+(.+)$""")
                 .find(intent)
             if (clickMatch != null) {
                 val label = clickMatch.groupValues[1].trim().trimEnd('.', '?', '!')
