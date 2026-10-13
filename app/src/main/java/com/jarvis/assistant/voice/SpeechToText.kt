@@ -25,7 +25,7 @@ class SpeechToText(private val context: Context) {
     private var longResultCallback: ((String) -> Unit)? = null
     private var longErrorCallback: (() -> Unit)? = null
     private val longSessionLimitMs = 5 * 60_000L
-    private val longQuietMs = 7_000L
+    private val longQuietMs = 10_000L
 
     private val wakeWords = listOf(
         "hey jarvis", "ok jarvis", "okay jarvis", "hi jarvis",
@@ -84,11 +84,9 @@ class SpeechToText(private val context: Context) {
             override fun onError(error: Int) {
                 if (!longSessionActive) return
                 Log.d("SpeechToText", "Long dictation segment error: $error")
-                if (longTranscript.isNotEmpty()) {
-                    longQuietRunnable?.let { mainHandler.removeCallbacks(it) }
-                    longQuietRunnable = Runnable { finishLongSession() }
-                    mainHandler.postDelayed(longQuietRunnable!!, longQuietMs)
-                }
+                // Do not restart the quiet timer on recognizer errors. Otherwise
+                // repeated no-match timeouts can keep a completed utterance alive
+                // until the full five-minute limit. Only new speech extends the timer.
                 if (error == SpeechRecognizer.ERROR_RECOGNIZER_BUSY) {
                     mainHandler.postDelayed({ startLongSession() }, 500L)
                 } else if (error == SpeechRecognizer.ERROR_NO_MATCH ||
