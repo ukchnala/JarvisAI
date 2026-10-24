@@ -1,0 +1,44 @@
+name: Build JarvisAI APK
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - '**'
+      - '.github/workflows/android-build.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    name: Build debug APK
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - name: Checkout source
+        uses: actions/checkout@v4
+
+      - name: Set up Java 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - name: Set up Gradle
+        uses: gradle/actions/setup-gradle@v4
+
+      - name: Make Gradle wrapper executable
+        run: chmod +x ./gradlew
+
+      - name: Build APK
+        run: ./gradlew --no-daemon assembleDebug
+
+      - name: Upload APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: JarvisAI-debug-APK
+          path: app/build/outputs/apk/debug/*.apk
+          if-no-files-found: error
+          retention-days: 14
